@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:v0.8.6
+    container_name: open-webui
+    restart: unless-stopped
+    ports:
+      - "3001:8080"
+    volumes:
+      - ./openwebui/volume:/app/backend/data
+    environment:
+      - OPENAI_API_BASE_URL=http://host.docker.internal:1234/v1
+      - OPENAI_API_KEY=lm-studio
+      - ENABLE_RAG_WEB_SEARCH=False
+      - ENABLE_REALTIME_CHAT_SAVE=False
+      - RAG_EMBEDDING_MODEL=""
+      - ENABLE_RAG=False
+    networks:
+      - webui-net
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  tika:
+    image: apache/tika:latest-full
+    container_name: tika
+    restart: unless-stopped
+    ports:
+      - 9998:9998
+    networks:
+      - webui-net
+
+networks:
+  webui-net:
+    driver: bridge

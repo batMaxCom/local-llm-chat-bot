@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Vite cache
+.vite/
+
+# Node
+node_modules/
+
+# Frontend build
+frontend/dist/
+
+# DB
+*.db
+
+# Enviroment
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# AI
+.ai
+openwebui/
