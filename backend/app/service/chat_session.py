@@ -4,7 +4,7 @@ from uuid import UUID
 from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import ChatSession
+from app.database.chat_session import ChatSession
 
 
 class ChatSessionService:
@@ -14,7 +14,7 @@ class ChatSessionService:
         stmt = insert(self.model).values(**values)
         await session.execute(stmt)
 
-    async def all(self, session: AsyncSession) -> list[dict]:
+    async def load_many(self, session: AsyncSession) -> list[dict]:
         stmt = select(self.model.id, self.model.title)
         rows = (await session.execute(stmt)).all()
 
@@ -22,7 +22,7 @@ class ChatSessionService:
             return [dict(row._mapping) for row in rows]
         return []
 
-    async def one_only(self, session: AsyncSession, chat_id: UUID) -> ChatSession | None:
+    async def load_only(self, session: AsyncSession, chat_id: UUID) -> ChatSession | None:
         stmt = select(self.model).where(self.model.id == chat_id)
         row = (await session.execute(stmt)).scalar_one_or_none()
         if row:

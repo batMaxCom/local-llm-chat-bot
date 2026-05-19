@@ -6,7 +6,10 @@ from sqlalchemy import Connection, pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.configs import get_settings
-from app.db import Base
+from app.database.base import Base
+
+from app.database.chat_session import ChatSession
+from app.database.message import Message
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

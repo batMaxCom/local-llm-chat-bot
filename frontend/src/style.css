@@ -447,6 +447,10 @@ textarea::placeholder {
 }
 
 /* Typing indicator */
+.scroll-sentinel {
+  height: 0;
+}
+
 .typing .content::after {
   content: '';
   display: inline-block;

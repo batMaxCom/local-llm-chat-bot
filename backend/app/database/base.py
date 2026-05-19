@@ -1,11 +1,9 @@
 from typing import AsyncGenerator, Any
 
-from sqlalchemy import Column, UUID, String, JSON, Text
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from sqlalchemy.orm import declarative_base, Mapped
+from sqlalchemy.orm import declarative_base
 
 from app.configs import get_settings
-from app.memory import SYSTEM_PROMPT
 
 settings = get_settings()
 engine = create_async_engine(settings.db_filename)
@@ -20,15 +18,3 @@ async def get_session() -> AsyncGenerator[AsyncSession, Any]:
             await session.rollback()
         finally:
             await session.commit()
-
-class ChatSession(Base):
-    __tablename__ = "chat_session"
-    id = Column('id', UUID(as_uuid=True), primary_key=True)
-    title = Column('title', String, nullable=None, default=None)
-    summary = Column('summary', Text(), nullable=True, default=None)
-    context: Mapped[list] = Column(
-        'context',
-        JSON,
-        nullable=False,
-        default=[]
-    )

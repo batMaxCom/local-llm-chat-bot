@@ -15,6 +15,9 @@ export default defineConfig(({ mode }) => ({
       '/chats': {
         target: 'http://localhost:8000',
       },
+      '/message': {
+        target: 'http://localhost:8000',
+      },
     },
   },
 }));

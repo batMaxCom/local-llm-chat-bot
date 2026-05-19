@@ -1,37 +1,52 @@
-from collections.abc import Generator
+from collections.abc import AsyncGenerator
 
-from openai import OpenAI
+from openai import AsyncOpenAI
+from transformers import AutoTokenizer
 
-client = OpenAI(
+MODEL_NAME = "qwen2.5-coder-7b-instruct"
+
+client = AsyncOpenAI(
     base_url="http://localhost:1234/v1",
     api_key="lm-studio",
 )
 
-MODEL_NAME = "qwen2.5-coder-7b-instruct"
+tokenizer = AutoTokenizer.from_pretrained(
+    "Qwen/Qwen2.5-Coder-7B-Instruct",
+)
 
 
-def generate_stream(
+def count_tokens(text: str) -> int:
+    return len(tokenizer.encode(text))
+
+
+def count_message_tokens(message: dict) -> int:
+    content = message.get("content", "")
+
+    return count_tokens(content)
+
+
+async def generate_stream(
     messages: list[dict],
-) -> Generator[str, None, None]:
-    stream = client.chat.completions.create(
+) -> AsyncGenerator[str, None]:
+    stream = await client.chat.completions.create(
         model=MODEL_NAME,
         messages=messages,
         temperature=0.7,
         stream=True,
     )
 
-    for chunk in stream:
+    async for chunk in stream:
         delta = chunk.choices[0].delta.content
 
         if delta:
             yield delta
 
 
-def generate_text(
+async def generate_text(
     messages: list[dict],
     temperature: float = 0.2,
 ) -> str:
-    response = client.chat.completions.create(
+    response = await client.chat.completions.create(
         model=MODEL_NAME,
         messages=messages,
         temperature=temperature,

@@ -1,10 +1,6 @@
 from dataclasses import dataclass, field
 
-
-SYSTEM_PROMPT = """
-You are a helpful AI assistant.
-Answer clearly and concisely.
-"""
+from app.memory.const import SYSTEM_PROMPT
 
 
 @dataclass

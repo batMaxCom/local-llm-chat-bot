@@ -16,6 +16,10 @@ let ws = null;
 let isStreaming = false;
 let currentMessageEl = null;
 let currentChatId = null;
+let isLoadingMessages = false;
+let hasMoreMessages = true;
+let oldestMessageId = null;
+let pageSize = 10;
 
 function escapeHtml(text) {
   return text
@@ -163,20 +167,112 @@ function renderChats(chats) {
   }
 }
 
-function selectChat(chatId) {
+function calcPageSize() {
+  const h = chat.clientHeight || 600;
+  return Math.max(10, Math.ceil(h / 60) + 5);
+}
+
+function createMessageEl(role, content) {
+  const div = document.createElement('div');
+  div.className = `message ${role}`;
+  const contentDiv = document.createElement('div');
+  contentDiv.className = 'content';
+  if (role === 'assistant' && content) {
+    contentDiv.innerHTML = renderMarkdown(content);
+  } else {
+    contentDiv.textContent = content;
+  }
+  div.appendChild(contentDiv);
+  return div;
+}
+
+async function loadMessages(chatId, beforeId) {
+  const params = new URLSearchParams({ session_id: chatId, limit: pageSize });
+  if (beforeId) params.set('before_id', beforeId);
+  const response = await fetch(`/message?${params}`);
+  return await response.json();
+}
+
+const BATCHES_TO_LOAD = 3;
+
+async function loadBatches(count) {
+  if (!currentChatId) return false;
+  let loadedAny = false;
+  let currentBeforeId = oldestMessageId;
+  let allMessages = [];
+
+  for (let i = 0; i < count && hasMoreMessages; i++) {
+    const data = await loadMessages(currentChatId, currentBeforeId);
+    if (!data || data.length === 0) {
+      hasMoreMessages = false;
+      break;
+    }
+    loadedAny = true;
+    currentBeforeId = data[0].id;
+    if (data.length < pageSize) hasMoreMessages = false;
+    allMessages = [...data, ...allMessages];
+  }
+
+  if (!loadedAny) return false;
+  oldestMessageId = currentBeforeId;
+
+  const frag = document.createDocumentFragment();
+  for (const m of allMessages) {
+    frag.appendChild(createMessageEl(m.role, m.content));
+  }
+
+  const prevHeight = chat.scrollHeight;
+  chat.insertBefore(frag, chat.firstChild);
+  chat.scrollTop = chat.scrollHeight - prevHeight;
+  return true;
+}
+
+async function selectChat(chatId) {
   if (ws) {
     ws.close();
     ws = null;
   }
   currentChatId = chatId;
-  chat.innerHTML = `
-    <div class="welcome-message">
-      <div class="welcome-icon">✦</div>
-      <p>Я — ваш AI-ассистент. Задайте мне любой вопрос.</p>
-    </div>
-  `;
   isStreaming = false;
   currentMessageEl = null;
+  isLoadingMessages = false;
+  hasMoreMessages = true;
+  oldestMessageId = null;
+  pageSize = calcPageSize();
+
+  chat.innerHTML = '';
+  chat.scrollTop = 0;
+
+  try {
+    const data = await loadMessages(chatId);
+
+    if (data && data.length > 0) {
+      oldestMessageId = data[0].id;
+      if (data.length < pageSize) hasMoreMessages = false;
+      const frag = document.createDocumentFragment();
+      for (const m of data) {
+        frag.appendChild(createMessageEl(m.role, m.content));
+      }
+      chat.appendChild(frag);
+    } else {
+      chat.innerHTML = `
+        <div class="welcome-message">
+          <div class="welcome-icon">✦</div>
+          <p>Я — ваш AI-ассистент. Задайте мне любой вопрос.</p>
+        </div>
+      `;
+    }
+  } catch {
+    chat.innerHTML = `
+      <div class="welcome-message">
+        <div class="welcome-icon">✦</div>
+        <p>Не удалось загрузить сообщения.</p>
+      </div>
+    `;
+  }
+
+  chat.scrollTop = chat.scrollHeight;
+  setupScrollObserver();
   loadChats();
 }
 
@@ -198,7 +294,32 @@ form.addEventListener('submit', (e) => {
   sendMessage();
 });
 
+let scrollObserver = null;
+let observerReady = false;
+
+function setupScrollObserver() {
+  if (scrollObserver) scrollObserver.disconnect();
+  const sentinel = document.createElement('div');
+  sentinel.className = 'scroll-sentinel';
+  chat.insertBefore(sentinel, chat.firstChild);
+  const observer = new IntersectionObserver(async ([entry]) => {
+    if (entry.isIntersecting && observerReady && !isLoadingMessages && currentChatId && hasMoreMessages) {
+      isLoadingMessages = true;
+      try {
+        await loadBatches(BATCHES_TO_LOAD);
+        chat.insertBefore(sentinel, chat.firstChild);
+      } catch {}
+      isLoadingMessages = false;
+    }
+  }, { root: chat, threshold: 0 });
+  observer.observe(sentinel);
+  scrollObserver = observer;
+  observerReady = false;
+  setTimeout(() => { observerReady = true; }, 200);
+}
+
 newChatBtn.addEventListener('click', () => {
+  if (scrollObserver) scrollObserver.disconnect();
   if (ws) {
     ws.close();
     ws = null;
