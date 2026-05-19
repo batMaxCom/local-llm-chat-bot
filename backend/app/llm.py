@@ -3,6 +3,8 @@ from collections.abc import AsyncGenerator
 from openai import AsyncOpenAI
 from transformers import AutoTokenizer
 
+from app.prompt.schemas import PromptBuildResult
+
 MODEL_NAME = "qwen2.5-coder-7b-instruct"
 
 client = AsyncOpenAI(
@@ -26,17 +28,22 @@ def count_message_tokens(message: dict) -> int:
 
 
 async def generate_stream(
-    messages: list[dict],
+    prompt: PromptBuildResult,
 ) -> AsyncGenerator[str, None]:
     stream = await client.chat.completions.create(
         model=MODEL_NAME,
-        messages=messages,
+        messages=prompt.messages,
         temperature=0.7,
         stream=True,
     )
 
     async for chunk in stream:
-        delta = chunk.choices[0].delta.content
+        delta = (
+            chunk
+            .choices[0]
+            .delta
+            .content
+        )
 
         if delta:
             yield delta

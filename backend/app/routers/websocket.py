@@ -4,10 +4,10 @@ from fastapi import APIRouter, Depends, WebSocket
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database.base import get_session
-from app.llm import generate_stream
-from app.memory.sliding_window import SlidingWindow
-from app.memory.summary import SummaryMemoryManager
+from app.llm import generate_stream, generate_text
+from app.memory.schemas import MemoryState
 from app.memory.token_sliding import TokenSlidingMemory
+from app.prompt.builder import PromptBuilder
 from app.service.chat_session import ChatSessionService
 from app.service.message import MessageService
 
@@ -25,11 +25,15 @@ async def websocket_endpoint(
     if chat is None:
         return
     await websocket.accept()
-    # memory = SummaryMemoryManager()
-    # memory = SlidingWindow()
-    memory = TokenSlidingMemory()
-    memory.summary = chat.summary
-    memory.recent_messages = chat.context
+
+    memory_state = MemoryState(
+        summary=chat.summary,
+        recent_messages=chat.context
+    )
+    memory = TokenSlidingMemory(
+        memory_state=memory_state,
+    )
+    builder = PromptBuilder()
     try:
         while True:
             user_message = (
@@ -39,32 +43,51 @@ async def websocket_endpoint(
                     not chat.title
                     and len(chat.context) >= 6
             ):
-                title = memory.generate_title()
+                title_prompt = builder.build_title_prompt(memory_state=memory.memory_state)
 
+                title = await generate_text(
+                   messages=title_prompt,
+                   temperature=0.1,
+                )
+                title = (
+                    title.strip()
+                    .replace('"', "")
+                    .replace("\n", " ")
+                )
                 await memory_service.update_title(session, chat_id, title)
+
                 await session.commit()
                 await websocket.send(title)
-            memory.add_user_message(user_message)
+            await memory.add_user_message(user_message)
 
-            messages = memory.build_messages()
+            prompt = builder.build_prompt(
+                memory_state=memory.memory_state,
+            )
+            print(
+                {
+                    "event": "prompt_generated",
+                    "total_tokens": prompt.total_tokens,
+                    "summary_tokens": prompt.summary_tokens,
+                    "recent_tokens": prompt.recent_tokens
+                }
+            )
 
             assistant_response = ""
 
-            async for chunk in generate_stream(messages):
+            async for chunk in generate_stream(prompt):
                 assistant_response += chunk
 
                 await websocket.send_text(chunk)
 
-            memory.add_assistant_message(
+            await memory.add_assistant_message(
                 assistant_response
             )
-            # Summary
-            if hasattr(memory, "should_summarize") and memory.should_summarize():
+            if await memory.should_summarize():
                 await memory.summarize()
-                await memory_service.update_summary(session, chat_id, memory.summary)
+                await memory_service.update_summary(session, chat_id, memory.memory_state.summary)
 
             await websocket.send_text("[END]")
-            await memory_service.update_context(session, chat_id, memory.recent_messages)
+            await memory_service.update_context(session, chat_id, memory.memory_state.recent_messages)
 
             await message_service.add(session, chat_id, "user", user_message)
             await message_service.add(session, chat_id, "assistant", assistant_response)
