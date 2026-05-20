@@ -33,5 +33,7 @@ class MemoryManager(ABC):
     @abstractmethod
     async def summarize(
         self,
+        old_messages: list[dict],
+        recent_messages: list[dict]
     ) -> None:
         pass

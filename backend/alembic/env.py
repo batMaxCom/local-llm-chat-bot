@@ -10,6 +10,7 @@ from app.database.base import Base
 
 from app.database.chat_session import ChatSession
 from app.database.message import Message
+from app.database.semantic_memory import SemanticMemory
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

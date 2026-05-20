@@ -21,7 +21,7 @@ class AppConfig:
         summary_trigger_messages  = int(environ.get("SUMMARY_TRIGGER_MESSAGES", default="20"))
         db_filename = environ.get("DB_FILENAME", default="app.db")
         max_context_tokens = int(environ.get("MAX_CONTEXT_TOKENS", default="3000"))
-        summary_trigger_tokens = int(environ.get("SUMMARY_TRIGGER_TOKENS", default="4000"))
+        summary_trigger_tokens = int(environ.get("SUMMARY_TRIGGER_TOKENS", default="1500"))
         runtime_window_tokens = int(environ.get("RUNTIME_WINDOW_TOKENS", default="1500"))
         reserved_output_tokens = int(environ.get("RESERVED_OUTPUT_TOKENS", default="1000"))
         db_url = f"sqlite+aiosqlite:///{db_filename}"

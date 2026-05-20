@@ -21,16 +21,8 @@ let hasMoreMessages = true;
 let oldestMessageId = null;
 let pageSize = 10;
 
-function escapeHtml(text) {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;');
-}
-
 function renderMarkdown(text) {
-  const escaped = escapeHtml(text);
-  return marked.parse(escaped);
+  return marked.parse(text);
 }
 
 function getWsUrl() {

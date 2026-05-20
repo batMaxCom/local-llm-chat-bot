@@ -63,3 +63,40 @@ Examples:
 - Qwen Context Window Problem
 - Alembic Restore Error
 """
+
+SEMANTIC_EXTRACTION_PROMPT = """
+You are a semantic memory extraction system.
+
+Extract ONLY persistent long-term facts.
+
+Keep:
+- frameworks
+- technologies
+- architecture decisions
+- project goals
+- user preferences
+- important technical constraints
+
+Ignore:
+- temporary debugging
+- smalltalk
+- short-term tasks
+- conversational filler
+
+Return JSON list.
+
+Example:
+
+[
+  {
+    "category": "framework",
+    "content": "Uses FastAPI"
+  },
+  {
+    "category": "architecture",
+    "content": "Uses async websocket architecture"
+  }
+]
+
+Return ONLY valid JSON.
+"""

@@ -1,9 +1,10 @@
 from dataclasses import dataclass
 
 from app.configs import get_settings
+from app.database.semantic_memory import SemanticMemory
 from app.llm import count_message_tokens
 from app.memory.schemas import MemoryState
-from app.prompt.const import (
+from app.const import (
     SYSTEM_PROMPT,
     TITLE_PROMPT,
 )
@@ -62,6 +63,33 @@ class PromptBuilder:
 
         total_tokens += system_tokens
 
+
+        if memory_state.semantic:
+            semantic_message = (
+                self._build_semantic_section(
+                    memory_state.semantic,
+                )
+            )
+
+            semantic_tokens = (
+                count_message_tokens(
+                    semantic_message,
+                )
+            )
+
+            if (
+                total_tokens
+                + semantic_tokens
+                <= effective_budget
+            ):
+                prompt_messages.append(
+                    semantic_message,
+                )
+
+                total_tokens += (
+                    semantic_tokens
+                )
+
         summary_tokens = 0
 
         if memory_state.summary:
@@ -110,8 +138,35 @@ class PromptBuilder:
             messages=prompt_messages,
             total_tokens=total_tokens,
             summary_tokens=summary_tokens,
+            semantic_tokens=semantic_tokens,
             recent_tokens=recent_tokens,
         )
+
+    @staticmethod
+    def _build_semantic_section(
+        semantic_memories: list[
+            SemanticMemory
+        ],
+    ) -> dict:
+        lines = []
+
+        for memory in semantic_memories:
+            lines.append(
+                (
+                    f"[{memory.category}] "
+                    f"{memory.content}"
+                )
+            )
+
+        content = (
+            "Persistent semantic memory:\n\n"
+            + "\n".join(lines)
+        )
+
+        return {
+            "role": "assistant",
+            "content": content,
+        }
 
     def build_title_prompt(
         self,

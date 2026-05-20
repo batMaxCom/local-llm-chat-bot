@@ -1,9 +1,9 @@
 from app.configs import get_settings
+from app.const import SUMMARY_PROMPT
 from app.llm import (
     count_message_tokens,
     generate_text,
 )
-from app.prompt.const import SUMMARY_PROMPT
 from app.memory.interface import MemoryManager
 
 settings = get_settings()
@@ -53,11 +53,9 @@ class TokenSlidingMemory(
 
     async def summarize(
         self,
+        old_messages: list[dict],
+        recent_messages: list[dict]
     ) -> None:
-        (
-            old_messages,
-            recent_messages,
-        ) = self._split_runtime_messages()
 
         if not old_messages:
             return
@@ -106,7 +104,7 @@ class TokenSlidingMemory(
             recent_messages
         )
 
-    def _split_runtime_messages(
+    def split_runtime_messages(
         self,
     ) -> tuple[list[dict], list[dict]]:
         recent_messages = []

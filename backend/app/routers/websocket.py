@@ -8,6 +8,8 @@ from app.llm import generate_stream, generate_text
 from app.memory.schemas import MemoryState
 from app.memory.token_sliding import TokenSlidingMemory
 from app.prompt.builder import PromptBuilder
+from app.semantic.extractor import SemanticExtractor
+from app.semantic.service import SemanticMemoryService
 from app.service.chat_session import ChatSessionService
 from app.service.message import MessageService
 
@@ -19,15 +21,18 @@ async def websocket_endpoint(
     websocket: WebSocket,
     memory_service = Depends(ChatSessionService),
     message_service = Depends(MessageService),
+    semantic_service = Depends(SemanticMemoryService),
+    extractor = Depends(SemanticExtractor),
     session: AsyncSession = Depends(get_session),
 ):
     chat = await memory_service.load_only(session, chat_id)
     if chat is None:
         return
     await websocket.accept()
-
+    semantic_memory_list = await semantic_service.get_recent_facts(session, chat.id)
     memory_state = MemoryState(
         summary=chat.summary,
+        semantic=semantic_memory_list,
         recent_messages=chat.context
     )
     memory = TokenSlidingMemory(
@@ -68,6 +73,7 @@ async def websocket_endpoint(
                     "event": "prompt_generated",
                     "total_tokens": prompt.total_tokens,
                     "summary_tokens": prompt.summary_tokens,
+                    "semantic_tokens": prompt.semantic_tokens,
                     "recent_tokens": prompt.recent_tokens
                 }
             )
@@ -83,8 +89,16 @@ async def websocket_endpoint(
                 assistant_response
             )
             if await memory.should_summarize():
-                await memory.summarize()
+                (old_messages, recent_messages) = memory.split_runtime_messages()
+                await memory.summarize(old_messages, recent_messages)
                 await memory_service.update_summary(session, chat_id, memory.memory_state.summary)
+
+                facts = await extractor.extract(old_messages)
+                await semantic_service.save_facts(
+                    session=session,
+                    session_id=chat_id,
+                    facts=facts,
+                )
 
             await websocket.send_text("[END]")
             await memory_service.update_context(session, chat_id, memory.memory_state.recent_messages)
